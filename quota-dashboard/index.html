@@ -2161,6 +2161,9 @@
     syncCollapsedPanels();
     setView("overview");
     load("/api/quotas");
+    setInterval(function () {
+      load("/api/quotas");
+    }, 3600000);
   })();
   </script>
 </body>
