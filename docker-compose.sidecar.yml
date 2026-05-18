@@ -1,0 +1,43 @@
+services:
+  quota-dashboard:
+    image: postgres:18-alpine
+    container_name: sub2api-quota-dashboard
+    restart: unless-stopped
+    volumes:
+      - ./quota-dashboard:/app:ro
+    environment:
+      - PORT=${QUOTA_DASHBOARD_INTERNAL_PORT:-8081}
+      - POSTGRES_HOST=${POSTGRES_HOST:?POSTGRES_HOST is required}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:-sub2api}
+      - SUB2API_BASE_URL=${QUOTA_DASHBOARD_SUB2API_BASE_URL:?QUOTA_DASHBOARD_SUB2API_BASE_URL is required}
+      - SUB2API_ADMIN_EMAIL=${QUOTA_DASHBOARD_ADMIN_EMAIL:-}
+      - SUB2API_ADMIN_PASSWORD=${QUOTA_DASHBOARD_ADMIN_PASSWORD:-}
+      - DASHBOARD_TOKEN=${QUOTA_DASHBOARD_TOKEN:-}
+      - QUOTA_DASHBOARD_PUBLIC_URL=${QUOTA_DASHBOARD_PUBLIC_URL:-}
+      - QUOTA_DASHBOARD_MENU_ID=${QUOTA_DASHBOARD_MENU_ID:-account-quota-dashboard}
+      - QUOTA_DASHBOARD_MENU_LABEL=${QUOTA_DASHBOARD_MENU_LABEL:-账号额度统计}
+      - QUOTA_DASHBOARD_MENU_VISIBILITY=${QUOTA_DASHBOARD_MENU_VISIBILITY:-admin}
+      - SNAPSHOT_INTERVAL_SECONDS=${QUOTA_DASHBOARD_SNAPSHOT_INTERVAL_SECONDS:-300}
+      - USAGE_REFRESH_INTERVAL_SECONDS=${QUOTA_DASHBOARD_USAGE_REFRESH_INTERVAL_SECONDS:-300}
+      - USAGE_REFRESH_BATCH_SIZE=${QUOTA_DASHBOARD_USAGE_REFRESH_BATCH_SIZE:-1000}
+      - USAGE_REFRESH_TIMEOUT_SECONDS=${QUOTA_DASHBOARD_USAGE_REFRESH_TIMEOUT_SECONDS:-15}
+      - TZ=${TZ:-Asia/Shanghai}
+    command: ["/bin/sh", "/app/server.sh", "server"]
+    ports:
+      - "${BIND_HOST:-0.0.0.0}:${QUOTA_DASHBOARD_PORT:-18081}:${QUOTA_DASHBOARD_INTERNAL_PORT:-8081}"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -T 5 -O /dev/null http://localhost:${QUOTA_DASHBOARD_INTERNAL_PORT:-8081}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+# If your sub2api containers run in a named Docker network, attach this service
+# to the same network and uncomment the block below.
+# networks:
+#   default:
+#     name: sub2api-network
+#     external: true

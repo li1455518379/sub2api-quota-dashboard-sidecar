@@ -1,0 +1,2167 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>账号额度统计</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f6f8;
+      --panel: #ffffff;
+      --panel-soft: #f7fafc;
+      --panel-strong: #0f172a;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: #dbe4ea;
+      --line-strong: #c4d1da;
+      --accent: #0f766e;
+      --accent-soft: rgba(15, 118, 110, 0.1);
+      --good: #15803d;
+      --good-soft: rgba(21, 128, 61, 0.12);
+      --warn: #b45309;
+      --warn-soft: rgba(180, 83, 9, 0.12);
+      --bad: #b91c1c;
+      --bad-soft: rgba(185, 28, 28, 0.12);
+      --info: #2563eb;
+      --info-soft: rgba(37, 99, 235, 0.12);
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.08);
+      --radius: 16px;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #020617;
+      --panel: #0f172a;
+      --panel-soft: #111c31;
+      --panel-strong: #0b1220;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --line: #243247;
+      --line-strong: #334155;
+      --accent: #2dd4bf;
+      --accent-soft: rgba(45, 212, 191, 0.14);
+      --good: #4ade80;
+      --good-soft: rgba(74, 222, 128, 0.14);
+      --warn: #f59e0b;
+      --warn-soft: rgba(245, 158, 11, 0.14);
+      --bad: #f87171;
+      --bad-soft: rgba(248, 113, 113, 0.14);
+      --info: #60a5fa;
+      --info-soft: rgba(96, 165, 250, 0.14);
+      --shadow: 0 1px 3px rgba(2, 6, 23, 0.45), 0 16px 40px rgba(2, 6, 23, 0.4);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html {
+      scroll-behavior: smooth;
+      overflow-y: scroll;
+      scrollbar-gutter: stable both-edges;
+      background: #ffffff;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #ffffff;
+      color: var(--text);
+      font: 14px/1.5 "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .shell {
+      max-width: 1520px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    :root[data-embedded="true"] .shell {
+      max-width: none;
+      padding: 12px;
+    }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      padding: 22px 24px;
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      display: none;
+    }
+    .hero h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 840px;
+    }
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      min-width: 280px;
+    }
+    .status-line {
+      text-align: right;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .btn-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 108px;
+      height: 42px;
+      padding: 0 16px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+    .btn:disabled {
+      opacity: 0.64;
+      cursor: default;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #0f766e, #115e59);
+      color: #ffffff;
+    }
+    .btn-secondary {
+      border-color: var(--line);
+      background: var(--panel);
+    }
+    .banner {
+      display: none;
+      margin-bottom: 16px;
+      padding: 13px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(185, 28, 28, 0.18);
+      background: var(--bad-soft);
+      color: var(--bad);
+    }
+    .toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .toolbar-panel {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      min-height: 68px;
+    }
+    .toolbar-label {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .scope-tabs,
+    .view-tabs {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+    }
+    .scope-tab,
+    .view-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .scope-tab.active,
+    .view-tab.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .scope-note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    .input,
+    .select {
+      height: 40px;
+      padding: 0 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+    }
+    .input {
+      width: 240px;
+      max-width: 100%;
+    }
+    .page {
+      display: none;
+      gap: 16px;
+    }
+    .page.active {
+      display: grid;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .card,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .card {
+      padding: 14px 16px;
+      min-height: 122px;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, rgba(15, 118, 110, 0.95), rgba(37, 99, 235, 0.75));
+    }
+    .card .label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .card .value {
+      margin-top: 8px;
+      font-size: 28px;
+      line-height: 1.05;
+      font-weight: 700;
+    }
+    .card .meta {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .card .mini-bar {
+      width: 100%;
+      height: 8px;
+      margin-top: 12px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      overflow: hidden;
+    }
+    .card .mini-bar > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--info));
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.9fr);
+      gap: 16px;
+    }
+    .panel {
+      overflow: hidden;
+    }
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px 0;
+    }
+    .panel-heading {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .panel-title {
+      margin: 0;
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .panel-toggle {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      align-items: start;
+      gap: 12px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      cursor: pointer;
+      text-align: left;
+    }
+    .panel-toggle:hover {
+      color: var(--text);
+    }
+    .panel-toggle:focus-visible {
+      outline: 2px solid rgba(15, 118, 110, 0.28);
+      outline-offset: 4px;
+      border-radius: 12px;
+    }
+    .panel-toggle-text {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .panel-toggle-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      flex: 0 0 28px;
+      align-self: start;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      transition: transform 0.16s ease;
+    }
+    .panel-toggle:hover .panel-title {
+      color: var(--accent);
+    }
+    .panel-toggle:hover .panel-toggle-icon,
+    .panel-toggle:focus-visible .panel-toggle-icon,
+    .panel-toggle:active .panel-toggle-icon {
+      border-color: var(--line);
+      background: transparent;
+      color: var(--muted);
+    }
+    .panel-head .caption {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .panel-body {
+      padding: 16px 18px 18px;
+    }
+    .panel.collapsed .panel-body {
+      display: none;
+    }
+    .panel.collapsed .panel-head {
+      padding-bottom: 16px;
+    }
+    .panel.collapsed .panel-head .caption {
+      display: none;
+    }
+    .panel.collapsed .panel-toggle-icon {
+      transform: rotate(-90deg);
+    }
+    .panel-stack {
+      display: grid;
+      gap: 14px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .pill-good {
+      background: var(--good-soft);
+      color: var(--good);
+    }
+    .pill-warn {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+    .pill-bad {
+      background: var(--bad-soft);
+      color: var(--bad);
+    }
+    .pill-info {
+      background: var(--info-soft);
+      color: var(--info);
+    }
+    .pill-neutral {
+      background: var(--panel-soft);
+      color: var(--muted);
+    }
+    .plan-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .plan-card {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel-soft);
+    }
+    .plan-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .plan-name {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .plan-count {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .bucket-stack {
+      display: grid;
+      gap: 10px;
+    }
+    .bucket {
+      padding: 12px;
+      border-radius: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+    .bucket-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .bucket-title {
+      font-weight: 700;
+    }
+    .bucket-total {
+      font-size: 24px;
+      font-weight: 700;
+    }
+    .bucket-meta {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .meter {
+      display: grid;
+      gap: 6px;
+    }
+    .meter-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      overflow: hidden;
+    }
+    .meter-fill {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #c2410c, #d97706 44%, #15803d 100%);
+    }
+    .meter-fill.good {
+      background: linear-gradient(90deg, #65a30d, #22c55e);
+    }
+    .meter-fill.warn {
+      background: linear-gradient(90deg, #f59e0b, #d97706);
+    }
+    .meter-fill.bad {
+      background: linear-gradient(90deg, #dc2626, #ef4444);
+    }
+    .state-grid,
+    .history-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .state-row,
+    .history-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+    .state-row .count,
+    .history-row .count {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .state-row .name,
+    .history-row .name {
+      font-weight: 700;
+    }
+    .state-row .hint,
+    .history-row .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .history-row {
+      grid-template-columns: 146px minmax(0, 1fr) 110px;
+    }
+    .table-wrap {
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+    .pager-slot,
+    .lane-pager {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .pager {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .pager-info {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pager-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      margin-left: auto;
+    }
+    .pager-btn,
+    .pager-dots {
+      height: 34px;
+      min-width: 34px;
+      padding: 0 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+    }
+    .pager-btn {
+      cursor: pointer;
+      transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    }
+    .pager-btn:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      background: var(--panel-soft);
+    }
+    .pager-btn.active {
+      border-color: rgba(15, 118, 110, 0.32);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .pager-btn:disabled {
+      opacity: 0.52;
+      cursor: default;
+    }
+    .pager-dots {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      cursor: default;
+    }
+    .pager-size-select {
+      width: 88px;
+      height: 34px;
+      padding: 0 10px;
+      margin: 0 6px;
+      border-radius: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 980px;
+    }
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--panel);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    tbody tr:hover {
+      background: var(--accent-soft);
+    }
+    .mono {
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+    }
+    .sort-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+    }
+    .sort-btn.active {
+      color: var(--accent);
+    }
+    .sort-indicator {
+      font-size: 11px;
+    }
+    .account-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .account-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      min-width: 0;
+      overflow: hidden;
+      cursor: pointer;
+      text-align: left;
+      color: inherit;
+      box-shadow: var(--shadow);
+    }
+    .account-card.active {
+      border-color: rgba(15, 118, 110, 0.42);
+      box-shadow: 0 0 0 1px rgba(15, 118, 110, 0.18), var(--shadow);
+    }
+    .account-card.failed {
+      border-color: rgba(185, 28, 28, 0.22);
+    }
+    .account-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .account-top-main {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .account-name {
+      font-size: 15px;
+      font-weight: 700;
+      word-break: break-all;
+    }
+    .account-sub {
+      color: var(--muted);
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .bucket-pair {
+      display: grid;
+      gap: 10px;
+    }
+    .bucket-chip {
+      display: grid;
+      gap: 5px;
+    }
+    .bucket-chip-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .bucket-chip-top > span {
+      min-width: 0;
+    }
+    .bucket-chip-top > strong {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+    .bucket-chip-track {
+      width: 100%;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--panel-soft);
+      overflow: hidden;
+    }
+    .bucket-chip-track > span {
+      display: block;
+      height: 100%;
+      border-radius: 999px;
+    }
+    .account-meta-line {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .account-meta-text {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+    }
+    .account-meta-time {
+      flex: 0 0 auto;
+      white-space: nowrap;
+      text-align: right;
+    }
+    .lane-wrap {
+      display: grid;
+      gap: 12px;
+    }
+    .lane {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .lane-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 16px;
+      background: var(--panel-soft);
+      border-bottom: 1px solid var(--line);
+    }
+    .lane-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 12px;
+      padding: 14px;
+    }
+    .lane-pager {
+      padding: 0 14px 14px;
+    }
+    .side {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: min(480px, 100vw);
+      transform: translateX(100%);
+      transition: transform 0.18s ease;
+      z-index: 30;
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      box-shadow: -16px 0 36px rgba(15, 23, 42, 0.16);
+    }
+    .side.open {
+      transform: translateX(0);
+    }
+    .side-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.36);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+      z-index: 29;
+    }
+    .side-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .side-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .side-head h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      line-height: 1.2;
+      word-break: break-all;
+    }
+    .side-body {
+      height: calc(100% - 88px);
+      overflow: auto;
+      padding: 16px 18px 20px;
+      display: grid;
+      gap: 14px;
+    }
+    .detail-block {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel-soft);
+    }
+    .detail-block h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .detail-item {
+      display: grid;
+      gap: 4px;
+    }
+    .detail-key {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .detail-value {
+      word-break: break-all;
+      font-weight: 600;
+    }
+    .empty {
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .hidden {
+      display: none !important;
+    }
+    @media (max-width: 1280px) {
+      .cards {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .plan-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 920px) {
+      .hero,
+      .toolbar {
+        grid-template-columns: 1fr;
+      }
+      .hero-actions {
+        align-items: stretch;
+        min-width: 0;
+      }
+      .btn-row {
+        justify-content: flex-start;
+      }
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .plan-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 640px) {
+      .shell {
+        padding: 12px;
+      }
+      .hero {
+        padding: 18px;
+      }
+      .hero h1 {
+        font-size: 24px;
+      }
+      .cards {
+        grid-template-columns: 1fr;
+      }
+      .filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .input,
+      .select {
+        width: 100%;
+      }
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+      .pager {
+        align-items: stretch;
+      }
+      .pager-controls {
+        margin-left: 0;
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div>
+        <h1>账号额度与健康状态</h1>
+        <p id="scopeNote">
+          周额度均值按「周额度累计总量 / 存活账号数」计算，可调度数量仅作为辅助健康信息展示。
+        </p>
+      </div>
+      <div class="hero-actions">
+        <div id="statusLine" class="status-line">正在读取上次结果...</div>
+        <div class="btn-row">
+          <button id="refresh" class="btn btn-primary" type="button">刷新额度</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="errorBanner" class="banner"></div>
+
+    <section class="toolbar">
+      <div class="toolbar-panel">
+        <div class="view-tabs" role="tablist" aria-label="页面视图">
+          <button data-view="overview" class="view-tab active" type="button">概览</button>
+          <button data-view="matrix" class="view-tab" type="button">矩阵</button>
+          <button data-view="recovery" class="view-tab" type="button">恢复</button>
+          <button data-view="history" class="view-tab" type="button">历史</button>
+        </div>
+      </div>
+      <div class="toolbar-panel">
+        <div class="filters">
+          <span class="toolbar-label">筛选</span>
+          <input id="searchInput" class="input" type="search" placeholder="搜账号名 / 邮箱 / ID">
+          <select id="stateFilter" class="select">
+            <option value="all">全部状态</option>
+            <option value="healthy">健康</option>
+            <option value="recovering">恢复中</option>
+            <option value="quota_limited">额度限制</option>
+            <option value="failed">失败</option>
+            <option value="untracked">未追踪</option>
+          </select>
+          <select id="planFilter" class="select">
+            <option value="all">全部套餐</option>
+          </select>
+          <select id="accountMode" class="select">
+            <option value="all">全部账号</option>
+            <option value="tracked">仅已追踪额度</option>
+            <option value="limited">仅受限账号</option>
+            <option value="recovering">仅恢复/受限</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section id="pageOverview" class="page active">
+      <div id="summaryCards" class="cards"></div>
+      <div class="grid-2">
+        <article class="panel">
+          <div class="panel-head">
+            <div class="panel-heading">
+              <button class="panel-toggle" type="button" data-collapse-id="overview-plans" aria-expanded="true">
+                <span class="panel-toggle-icon">▾</span>
+                <span class="panel-toggle-text">
+                  <h2 class="panel-title">套餐额度概览</h2>
+                  <div class="caption">按统一口径展示各套餐周额度、5h 额度和调度容量</div>
+                </span>
+              </button>
+            </div>
+            <span id="planOverviewBadge" class="pill pill-info">统一口径</span>
+          </div>
+          <div class="panel-body plan-grid" data-collapse-body="overview-plans" id="planGrid"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <div class="panel-heading">
+              <button class="panel-toggle" type="button" data-collapse-id="overview-health" aria-expanded="true">
+                <span class="panel-toggle-icon">▾</span>
+                <span class="panel-toggle-text">
+                  <h2 class="panel-title">健康分布</h2>
+                  <div class="caption">健康、恢复中、额度限制、失败、未追踪</div>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="panel-body state-grid" data-collapse-body="overview-health" id="stateGrid"></div>
+        </article>
+      </div>
+      <div class="grid-2">
+        <article class="panel">
+          <div class="panel-head">
+            <div class="panel-heading">
+              <button class="panel-toggle" type="button" data-collapse-id="overview-recovery" aria-expanded="true">
+                <span class="panel-toggle-icon">▾</span>
+                <span class="panel-toggle-text">
+                  <h2 class="panel-title">恢复优先队列</h2>
+                  <div class="caption">优先展示有恢复时间的账号，支持分页和每页条数选择。</div>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="panel-body panel-stack" data-collapse-body="overview-recovery">
+            <div id="recoveryPreview" class="account-grid"></div>
+            <div id="recoveryPreviewPager" class="pager-slot"></div>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="panel-head">
+            <div class="panel-heading">
+              <button class="panel-toggle" type="button" data-collapse-id="overview-history" aria-expanded="true">
+                <span class="panel-toggle-icon">▾</span>
+                <span class="panel-toggle-text">
+                  <h2 class="panel-title">最近快照</h2>
+                  <div class="caption">历史快照保存在独立统计表里，支持分页查看。</div>
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="panel-body panel-stack" data-collapse-body="overview-history">
+            <div id="historyPreview" class="history-grid"></div>
+            <div id="historyPreviewPager" class="pager-slot"></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="pageMatrix" class="page">
+      <article class="panel">
+        <div class="panel-head">
+          <div class="panel-heading">
+            <button class="panel-toggle" type="button" data-collapse-id="matrix-main" aria-expanded="true">
+              <span class="panel-toggle-icon">▾</span>
+              <span class="panel-toggle-text">
+                <h2 class="panel-title">账号矩阵</h2>
+                <div class="caption">按筛选条件分页查看账号的周额度、5h 额度、状态与恢复时间。</div>
+              </span>
+            </button>
+          </div>
+          <span id="matrixCount" class="pill pill-neutral">0</span>
+        </div>
+        <div class="panel-body panel-stack" data-collapse-body="matrix-main">
+          <div id="matrixGrid" class="account-grid"></div>
+          <div id="matrixPager" class="pager-slot"></div>
+        </div>
+      </article>
+    </section>
+
+    <section id="pageRecovery" class="page">
+      <article class="panel">
+        <div class="panel-head">
+          <div class="panel-heading">
+            <button class="panel-toggle" type="button" data-collapse-id="recovery-main" aria-expanded="true">
+              <span class="panel-toggle-icon">▾</span>
+              <span class="panel-toggle-text">
+                <h2 class="panel-title">恢复时间带</h2>
+                <div class="caption">按当前筛选结果，把账号按最近恢复/重置时间分成即将恢复、今日恢复、三天内恢复、更晚恢复与未知，并在每个分组内分页。</div>
+              </span>
+            </button>
+          </div>
+          <span id="recoveryCount" class="pill pill-neutral">0</span>
+        </div>
+        <div id="recoveryLanes" class="panel-body lane-wrap" data-collapse-body="recovery-main"></div>
+      </article>
+    </section>
+
+    <section id="pageHistory" class="page">
+      <article class="panel">
+        <div class="panel-head">
+          <div class="panel-heading">
+            <button class="panel-toggle" type="button" data-collapse-id="history-main" aria-expanded="true">
+              <span class="panel-toggle-icon">▾</span>
+              <span class="panel-toggle-text">
+                <h2 class="panel-title">统计历史</h2>
+                <div class="caption">每次自动快照都会记录账号健康与额度变化，支持分页查看。</div>
+              </span>
+            </button>
+          </div>
+          <span id="historyCount" class="pill pill-neutral">0</span>
+        </div>
+        <div class="panel-body panel-stack" data-collapse-body="history-main">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-sort-key="captured_at">时间</th>
+                  <th data-sort-key="total_accounts">总账号</th>
+                  <th data-sort-key="healthy_accounts">健康</th>
+                  <th data-sort-key="recovering_accounts">恢复中</th>
+                  <th data-sort-key="quota_limited_accounts">额度限制</th>
+                  <th data-sort-key="failed_accounts">失败</th>
+                  <th data-sort-key="tracked_7d_accounts">周额度成功</th>
+                  <th data-sort-key="schedulable_tracked_7d_accounts">可调度周额度成功</th>
+                  <th data-sort-key="avg_all_7d_remaining_pct">全量周额度均值</th>
+                  <th data-sort-key="avg_7d_remaining_pct">可调度周额度均值</th>
+                  <th data-sort-key="total_all_7d_equiv_accounts">全量等效</th>
+                  <th data-sort-key="total_7d_equiv_accounts">可调度等效</th>
+                </tr>
+              </thead>
+              <tbody id="historyRows"></tbody>
+            </table>
+          </div>
+          <div id="historyPager" class="pager-slot"></div>
+        </div>
+      </article>
+    </section>
+  </div>
+
+  <div id="sideBackdrop" class="side-backdrop"></div>
+  <aside id="detailSide" class="side" aria-hidden="true">
+    <div class="side-head">
+      <div>
+        <h2 id="detailTitle">账号详情</h2>
+        <div id="detailSubtitle" class="caption"></div>
+      </div>
+    </div>
+    <div id="detailBody" class="side-body"></div>
+  </aside>
+
+  <script>
+  (function () {
+    "use strict";
+
+    var COLLAPSE_STORAGE_KEY = "quota-dashboard-collapse-state-v1";
+    var PAGE_DEFAULT_SIZE = {
+      recoveryPreview: 10,
+      historyPreview: 10,
+      matrix: 20,
+      recoveryLane: 20,
+      history: 20
+    };
+    var PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+    function getParam(name) {
+      var query = location.search.slice(1).split("&");
+      var i;
+      for (i = 0; i < query.length; i += 1) {
+        var pair = query[i].split("=");
+        if (decodeURIComponent(pair[0] || "") === name) {
+          return decodeURIComponent((pair[1] || "").replace(/\+/g, "%20"));
+        }
+      }
+      return "";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function pct(value) {
+      if (value === null || value === undefined || value === "") return "-";
+      var n = Number(value);
+      if (isNaN(n)) return "-";
+      return n.toFixed(2) + "%";
+    }
+
+    function shortPct(value) {
+      if (value === null || value === undefined || value === "") return "-";
+      var n = Number(value);
+      if (isNaN(n)) return "-";
+      return (Math.abs(n - Math.round(n)) < 0.05 ? Math.round(n) : n.toFixed(1)) + "%";
+    }
+
+    function numberText(value) {
+      if (value === null || value === undefined || value === "") return "-";
+      var n = Number(value);
+      if (isNaN(n)) return "-";
+      return Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(2);
+    }
+
+    function dt(value) {
+      if (!value) return "-";
+      var d = new Date(value);
+      if (isNaN(d.getTime())) return String(value);
+      return d.toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+    }
+
+    function parseTime(value) {
+      if (!value) return null;
+      var d = new Date(value);
+      if (isNaN(d.getTime())) return null;
+      return d.getTime();
+    }
+
+    function remainingClass(value) {
+      if (value === null || value === undefined || value === "") return "bad";
+      var n = Number(value);
+      if (isNaN(n)) return "bad";
+      if (n < 20) return "bad";
+      if (n < 50) return "warn";
+      return "good";
+    }
+
+    function stateLabel(state) {
+      switch (state) {
+        case "healthy": return "健康";
+        case "recovering": return "恢复中";
+        case "quota_limited": return "额度限制";
+        case "failed": return "失败";
+        case "untracked": return "未追踪";
+        default: return "未知";
+      }
+    }
+
+    function statePillClass(state) {
+      switch (state) {
+        case "healthy": return "pill pill-good";
+        case "recovering": return "pill pill-info";
+        case "quota_limited": return "pill pill-warn";
+        case "failed": return "pill pill-bad";
+        default: return "pill pill-neutral";
+      }
+    }
+
+    function recoverySourceLabel(value) {
+      switch (value) {
+        case "weekly": return "周额度恢复";
+        case "five_hour": return "5h 恢复";
+        case "rate_limit": return "限流恢复";
+        case "temp_unschedulable": return "临时冻结恢复";
+        case "overload": return "过载恢复";
+        default: return "未知恢复来源";
+      }
+    }
+
+    function planLabel(value) {
+      var v = String(value || "").toLowerCase();
+      if (!v || v === "unknown") return "未识别";
+      if (v === "free") return "Free";
+      if (v === "plus") return "Plus";
+      if (v === "pro") return "Pro";
+      if (v === "team") return "Team";
+      if (v === "business") return "Business";
+      if (v === "enterprise") return "Enterprise";
+      return v.charAt(0).toUpperCase() + v.slice(1);
+    }
+
+    function authQuery() {
+      if (state.secret) return "secret=" + encodeURIComponent(state.secret);
+      if (state.token) return "token=" + encodeURIComponent(state.token);
+      return "";
+    }
+
+    function request(url, done) {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+          done(null, xhr.responseText);
+          return;
+        }
+        done(new Error(xhr.responseText || ("HTTP " + xhr.status)));
+      };
+      xhr.onerror = function () {
+        done(new Error("网络请求失败"));
+      };
+      xhr.send(null);
+    }
+
+    function readCollapseState() {
+      try {
+        if (!window.localStorage) return {};
+        var raw = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
+        if (!raw) return {};
+        var parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function writeCollapseState() {
+      try {
+        if (!window.localStorage) return;
+        window.localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(state.collapsedPanels));
+      } catch (err) {
+        return;
+      }
+    }
+
+    function setPanelCollapsed(id, collapsed) {
+      state.collapsedPanels[id] = !!collapsed;
+      writeCollapseState();
+      syncCollapsedPanels();
+    }
+
+    function syncCollapsedPanels() {
+      Array.prototype.slice.call(document.querySelectorAll("[data-collapse-id]")).forEach(function (toggle) {
+        var id = toggle.getAttribute("data-collapse-id");
+        var collapsed = !!state.collapsedPanels[id];
+        var panel = toggle.closest(".panel");
+        if (panel) panel.classList.toggle("collapsed", collapsed);
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      });
+    }
+
+    function filteredAccounts() {
+      if (!state.payload || !state.payload.accounts) return [];
+      var list = state.payload.accounts.slice();
+      var q = String(elements.searchInput.value || "").trim().toLowerCase();
+      var stateFilter = elements.stateFilter.value;
+      var planFilter = elements.planFilter.value;
+      var mode = elements.accountMode.value;
+      return list.filter(function (row) {
+        if (stateFilter !== "all" && row.state_key !== stateFilter) return false;
+        if (planFilter !== "all" && String(row.plan_type || "") !== planFilter) return false;
+        if (mode === "tracked" && !row.has_quota_data) return false;
+        if (mode === "limited" && row.state_key !== "quota_limited" && row.state_key !== "recovering") return false;
+        if (mode === "recovering" && row.state_key !== "recovering" && row.state_key !== "quota_limited") return false;
+        if (!q) return true;
+        var hay = [
+          row.id,
+          row.name,
+          row.plan_type,
+          row.state_key,
+          row.state_reason,
+          row.quota_refresh_error
+        ].join(" ").toLowerCase();
+        return hay.indexOf(q) >= 0;
+      });
+    }
+
+    function recoveryTimeValue(row) {
+      return parseTime(row.earliest_recovery_at) ||
+        parseTime(row.weekly_recovery_at) ||
+        parseTime(row.weekly_next_reset_at) ||
+        parseTime(row.five_hour_recovery_at) ||
+        parseTime(row.five_hour_next_reset_at) ||
+        parseTime(row.rate_limit_reset_at) ||
+        parseTime(row.temp_unschedulable_until) ||
+        parseTime(row.overload_until);
+    }
+
+    function recoveryCandidates(list) {
+      return list.filter(function (row) {
+        return row.state_key === "recovering" || row.state_key === "quota_limited";
+      });
+    }
+
+    function sortAccounts(list) {
+      list.sort(function (left, right) {
+        var stateRank = {
+          failed: 0,
+          recovering: 1,
+          quota_limited: 2,
+          healthy: 3,
+          untracked: 4
+        };
+        var leftRank = stateRank[left.state_key] == null ? 9 : stateRank[left.state_key];
+        var rightRank = stateRank[right.state_key] == null ? 9 : stateRank[right.state_key];
+        if (leftRank !== rightRank) return leftRank - rightRank;
+        var leftPct = left.weekly_remaining_percent == null ? 999 : Number(left.weekly_remaining_percent);
+        var rightPct = right.weekly_remaining_percent == null ? 999 : Number(right.weekly_remaining_percent);
+        if (leftPct !== rightPct) return leftPct - rightPct;
+        var leftReset = parseTime(left.earliest_recovery_at) || parseTime(left.weekly_next_reset_at) || parseTime(left.five_hour_next_reset_at) || Number.MAX_SAFE_INTEGER;
+        var rightReset = parseTime(right.earliest_recovery_at) || parseTime(right.weekly_next_reset_at) || parseTime(right.five_hour_next_reset_at) || Number.MAX_SAFE_INTEGER;
+        if (leftReset !== rightReset) return leftReset - rightReset;
+        return String(left.name || "").localeCompare(String(right.name || ""), "zh-CN");
+      });
+    }
+
+    function sortRecoveryRows(list) {
+      list.sort(function (left, right) {
+        var leftReset = recoveryTimeValue(left) || Number.MAX_SAFE_INTEGER;
+        var rightReset = recoveryTimeValue(right) || Number.MAX_SAFE_INTEGER;
+        if (leftReset !== rightReset) return leftReset - rightReset;
+        var leftState = left.state_key === "recovering" ? 0 : (left.state_key === "quota_limited" ? 1 : 2);
+        var rightState = right.state_key === "recovering" ? 0 : (right.state_key === "quota_limited" ? 1 : 2);
+        if (leftState !== rightState) return leftState - rightState;
+        var leftPct = left.weekly_remaining_percent == null ? 999 : Number(left.weekly_remaining_percent);
+        var rightPct = right.weekly_remaining_percent == null ? 999 : Number(right.weekly_remaining_percent);
+        if (leftPct !== rightPct) return leftPct - rightPct;
+        return String(left.name || "").localeCompare(String(right.name || ""), "zh-CN");
+      });
+    }
+
+    function laneKeyFor(row) {
+      var ts = recoveryTimeValue(row);
+      if (!ts) return "unknown";
+      var diffHours = (ts - Date.now()) / 3600000;
+      if (diffHours <= 6) return "immediate";
+      if (diffHours <= 24) return "today";
+      if (diffHours <= 72) return "soon";
+      return "later";
+    }
+
+    function laneLabel(key) {
+      switch (key) {
+        case "immediate": return "即将恢复";
+        case "today": return "今日恢复";
+        case "soon": return "三天内恢复";
+        case "later": return "更晚恢复";
+        default: return "恢复时间未知";
+      }
+    }
+
+    function pageSizeFor(pagerId, fallback) {
+      var size = Number(state.pageSizes[pagerId] || fallback);
+      if (!isFinite(size) || PAGE_SIZE_OPTIONS.indexOf(size) === -1) return fallback;
+      return size;
+    }
+
+    function pageSizeSelectHtml(pagerId, currentSize) {
+      return '' +
+        '<label class="pager-info">每页 ' +
+          '<select class="select pager-size-select" data-page-size-id="' + escapeHtml(pagerId) + '">' +
+            PAGE_SIZE_OPTIONS.map(function (size) {
+              return '<option value="' + escapeHtml(String(size)) + '"' + (size === currentSize ? ' selected' : '') + '>' + escapeHtml(String(size)) + '</option>';
+            }).join("") +
+          '</select>' +
+        ' 条</label>';
+    }
+
+    function paginate(list, pagerId, fallbackSize) {
+      var total = list.length;
+      var size = pageSizeFor(pagerId, fallbackSize);
+      var totalPages = Math.max(1, Math.ceil(total / size));
+      var page = Number(state.pages[pagerId] || 1);
+      if (!isFinite(page) || page < 1) page = 1;
+      if (page > totalPages) page = totalPages;
+      state.pages[pagerId] = page;
+      var startIndex = (page - 1) * size;
+      return {
+        total: total,
+        totalPages: totalPages,
+        page: page,
+        size: size,
+        start: total ? (startIndex + 1) : 0,
+        end: Math.min(total, startIndex + size),
+        items: list.slice(startIndex, startIndex + size)
+      };
+    }
+
+    function pageSeries(current, totalPages) {
+      var pages = [];
+      var i;
+      if (totalPages <= 7) {
+        for (i = 1; i <= totalPages; i += 1) pages.push(i);
+        return pages;
+      }
+      pages.push(1);
+      if (current > 3) pages.push("dots-left");
+      for (i = Math.max(2, current - 1); i <= Math.min(totalPages - 1, current + 1); i += 1) {
+        pages.push(i);
+      }
+      if (current < totalPages - 2) pages.push("dots-right");
+      pages.push(totalPages);
+      return pages;
+    }
+
+    function pagerButton(pagerId, page, label, disabled, active) {
+      return '<button class="pager-btn' + (active ? ' active' : '') + '" type="button" data-pager-id="' + escapeHtml(pagerId) + '" data-page-number="' + escapeHtml(String(page)) + '"' + (disabled ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
+    }
+
+    function pagerHtml(pagerId, meta, noun) {
+      if (!meta.total) return "";
+      var items = [];
+      if (meta.totalPages > 1) {
+        items.push(pagerButton(pagerId, meta.page - 1, "上一页", meta.page <= 1, false));
+        pageSeries(meta.page, meta.totalPages).forEach(function (entry) {
+          if (typeof entry === "number") {
+            items.push(pagerButton(pagerId, entry, String(entry), false, entry === meta.page));
+            return;
+          }
+          items.push('<span class="pager-dots">...</span>');
+        });
+        items.push(pagerButton(pagerId, meta.page + 1, "下一页", meta.page >= meta.totalPages, false));
+      }
+      return '' +
+        '<div class="pager">' +
+          '<div class="pager-info">显示 ' + escapeHtml(String(meta.start)) + '-' + escapeHtml(String(meta.end)) + ' / ' + escapeHtml(String(meta.total)) + escapeHtml(noun) + '</div>' +
+          '<div class="pager-controls">' + pageSizeSelectHtml(pagerId, meta.size) + items.join("") + '</div>' +
+        '</div>';
+    }
+
+    function resetFilteredPages() {
+      Object.keys(state.pages).forEach(function (key) {
+        if (key === "history" || key === "historyPreview") return;
+        state.pages[key] = 1;
+      });
+    }
+
+    function bucketBar(value) {
+      var n = Number(value);
+      if (value === null || value === undefined || value === "" || isNaN(n)) {
+        return '<div class="bucket-chip-track"><span style="width:0%"></span></div>';
+      }
+      var cls = remainingClass(n);
+      var color = cls === "good" ? "#16a34a" : (cls === "warn" ? "#d97706" : "#dc2626");
+      return '<div class="bucket-chip-track"><span style="width:' + Math.max(0, Math.min(100, n)) + '%;background:' + color + '"></span></div>';
+    }
+
+    function accountCard(row) {
+      var weekly = row.weekly_remaining_percent;
+      var five = row.five_hour_remaining_percent;
+      var weeklyReset = row.weekly_recovery_at || row.weekly_next_reset_at || row.codex_7d_next_reset_at;
+      var fiveReset = row.five_hour_recovery_at || row.five_hour_next_reset_at || row.codex_5h_next_reset_at;
+      return '' +
+        '<button class="account-card' + (state.selectedId === row.id ? ' active' : '') + (row.state_key === "failed" ? ' failed' : '') + '" type="button" data-account-id="' + escapeHtml(row.id) + '">' +
+          '<div class="account-top">' +
+            '<div class="account-top-main">' +
+              '<div class="account-name">' + escapeHtml(row.name || "-") + '</div>' +
+              '<div class="account-sub">#' + escapeHtml(row.id) + ' · ' + escapeHtml(planLabel(row.plan_type)) + '</div>' +
+            '</div>' +
+            '<span class="' + statePillClass(row.state_key) + '">' + escapeHtml(stateLabel(row.state_key)) + '</span>' +
+          '</div>' +
+          '<div class="bucket-pair">' +
+            '<div class="bucket-chip">' +
+              '<div class="bucket-chip-top"><span>周额度</span><strong>' + escapeHtml(shortPct(weekly)) + '</strong></div>' +
+              bucketBar(weekly) +
+              '<div class="account-sub">恢复：' + escapeHtml(dt(weeklyReset)) + '</div>' +
+            '</div>' +
+            '<div class="bucket-chip">' +
+              '<div class="bucket-chip-top"><span>5h 额度</span><strong>' + escapeHtml(shortPct(five)) + '</strong></div>' +
+              bucketBar(five) +
+              '<div class="account-sub">恢复：' + escapeHtml(dt(fiveReset)) + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="account-meta-line">' +
+            '<span class="account-meta-text" title="' + escapeHtml(row.state_reason || "-") + '">' + escapeHtml(row.state_reason || "-") + '</span>' +
+            '<span class="account-meta-time mono">' + escapeHtml(dt(row.usage_updated_at)) + '</span>' +
+          '</div>' +
+        '</button>';
+    }
+
+    function setStatus(text) {
+      elements.statusLine.textContent = text;
+    }
+
+    function setLoading(next) {
+      state.loading = !!next;
+      elements.refresh.disabled = state.loading;
+      elements.refresh.textContent = state.loading ? "刷新中..." : "刷新额度";
+    }
+
+    function showError(message) {
+      elements.errorBanner.textContent = "加载失败：" + message;
+      elements.errorBanner.style.display = "block";
+    }
+
+    function clearError() {
+      elements.errorBanner.style.display = "none";
+      elements.errorBanner.textContent = "";
+    }
+
+    function populatePlanFilter() {
+      if (!state.payload || !state.payload.accounts) return;
+      var seen = {};
+      var current = elements.planFilter.value || "all";
+      var options = ['<option value="all">全部套餐</option>'];
+      state.payload.accounts.forEach(function (row) {
+        var key = String(row.plan_type || "unknown");
+        if (seen[key]) return;
+        seen[key] = true;
+        options.push('<option value="' + escapeHtml(key) + '">' + escapeHtml(planLabel(key)) + '</option>');
+      });
+      elements.planFilter.innerHTML = options.join("");
+      if (current === "all" || seen[current]) {
+        elements.planFilter.value = current;
+      }
+    }
+
+    function renderSummaryCards() {
+      var s = state.payload.summary || {};
+      var total = Number(s.total_accounts || 0);
+      var tracked = Number(s.tracked_accounts || 0);
+      var alive = Number(s.alive_accounts || 0);
+      var healthy = Number(s.healthy_accounts || 0);
+      var recovering = Number(s.recovering_accounts || 0);
+      var limited = Number(s.quota_limited_accounts || 0);
+      var failed = Number(s.failed_accounts || 0);
+      var weeklyEquiv = s.total_all_7d_equiv_accounts;
+      var weeklyAvg = alive > 0 && weeklyEquiv != null ? (Number(weeklyEquiv) * 100 / alive) : null;
+      var tracked7d = s.tracked_7d_accounts;
+      var coverage = total > 0 ? (tracked * 100 / total) : 0;
+      var survival = s.survival_rate_pct != null ? Number(s.survival_rate_pct) : null;
+      var health = s.health_rate_pct != null ? Number(s.health_rate_pct) : null;
+      var schedulable = Number(s.schedulable_accounts || 0);
+      var cards = [
+        {
+          label: "存活账号",
+          value: String(alive),
+          meta: "总账号 " + total + " · 可调度 " + schedulable + " 个",
+          fill: total > 0 ? (alive * 100 / total) : 0
+        },
+        {
+          label: "周额度均值",
+          value: shortPct(weeklyAvg),
+          meta: "周总量 " + numberText(weeklyEquiv) + " / 存活 " + alive + " 个",
+          fill: weeklyAvg
+        },
+        {
+          label: "周额度等效总量",
+          value: numberText(weeklyEquiv),
+          meta: "周剩余百分比累计值 / 100",
+          fill: weeklyAvg
+        },
+        {
+          label: "健康账号池",
+          value: String(healthy),
+          meta: "恢复中 " + recovering + " · 额度限制 " + limited + " · 总库存 " + total,
+          fill: health
+        },
+        {
+          label: "失败账号",
+          value: String(failed),
+          meta: "刷新失败 " + numberText(s.refresh_failed_accounts) + " · 未追踪 " + numberText(s.untracked_accounts),
+          fill: total > 0 ? Math.max(0, 100 - failed * 100 / total) : 0
+        },
+        {
+          label: "存活率",
+          value: shortPct(survival),
+          meta: "健康率 " + shortPct(health) + " · 周额度成功 " + numberText(tracked7d),
+          fill: survival
+        }
+      ];
+      elements.summaryCards.innerHTML = cards.map(function (card) {
+        return '' +
+          '<article class="card">' +
+            '<div class="label">' + escapeHtml(card.label) + '</div>' +
+            '<div class="value">' + escapeHtml(card.value) + '</div>' +
+            '<div class="meta">' + escapeHtml(card.meta) + '</div>' +
+            '<div class="mini-bar"><span style="width:' + Math.max(0, Math.min(100, Number(card.fill || 0))) + '%"></span></div>' +
+          '</article>';
+      }).join("");
+    }
+
+    function renderPlans() {
+      var plans = state.payload.plans || [];
+      elements.planOverviewBadge.textContent = "统一口径";
+      if (!plans.length) {
+        elements.planGrid.innerHTML = '<div class="empty">暂无套餐统计</div>';
+        return;
+      }
+      elements.planGrid.innerHTML = plans.map(function (plan) {
+        var weekly = plan.weekly || {};
+        var five = plan.five_hour || {};
+        var aliveCount = Number(plan.account_count || 0) - Number(plan.failed_accounts || 0);
+        var weeklyAvg = aliveCount > 0 && weekly.total_remaining_percent != null ? Number(weekly.total_remaining_percent) / aliveCount : null;
+        var weeklyTotal = weekly.total_remaining_percent;
+        var weeklySuccess = weekly.success_count;
+        var fiveAvg = aliveCount > 0 && five.total_remaining_percent != null ? Number(five.total_remaining_percent) / aliveCount : null;
+        var fiveTotal = five.total_remaining_percent;
+        var fiveSuccess = five.success_count;
+        return '' +
+          '<div class="plan-card">' +
+            '<div class="plan-head">' +
+              '<div class="plan-name">' + escapeHtml(planLabel(plan.plan_type)) + '</div>' +
+              '<div class="plan-count">总 ' + escapeHtml(String(plan.account_count)) + ' / 存活 ' + escapeHtml(String(aliveCount)) + '</div>' +
+            '</div>' +
+            '<div class="bucket-stack">' +
+              '<div class="bucket">' +
+                '<div class="bucket-top">' +
+                  '<div><div class="bucket-title">周额度</div><div class="bucket-meta">成功 ' + escapeHtml(numberText(weeklySuccess)) + ' · 失败 ' + escapeHtml(numberText(weekly.failed_count)) + '</div></div>' +
+                  '<div class="bucket-total">' + escapeHtml(shortPct(weeklyAvg)) + '</div>' +
+                '</div>' +
+                '<div class="meter"><div class="meter-track"><span class="meter-fill ' + remainingClass(weeklyAvg) + '" style="width:' + Math.max(0, Math.min(100, Number(weeklyAvg || 0))) + '%"></span></div></div>' +
+                '<div class="bucket-meta">总量 ' + escapeHtml(numberText(weeklyTotal)) + ' · 恢复 ' + escapeHtml(dt(weekly.reset_at)) + '</div>' +
+              '</div>' +
+              '<div class="bucket">' +
+                '<div class="bucket-top">' +
+                  '<div><div class="bucket-title">5h 额度</div><div class="bucket-meta">成功 ' + escapeHtml(numberText(fiveSuccess)) + ' · 失败 ' + escapeHtml(numberText(five.failed_count)) + '</div></div>' +
+                  '<div class="bucket-total">' + escapeHtml(shortPct(fiveAvg)) + '</div>' +
+                '</div>' +
+                '<div class="meter"><div class="meter-track"><span class="meter-fill ' + remainingClass(fiveAvg) + '" style="width:' + Math.max(0, Math.min(100, Number(fiveAvg || 0))) + '%"></span></div></div>' +
+                '<div class="bucket-meta">总量 ' + escapeHtml(numberText(fiveTotal)) + ' · 恢复 ' + escapeHtml(dt(five.reset_at)) + '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>';
+      }).join("");
+    }
+
+    function renderStateGrid() {
+      var s = state.payload.summary || {};
+      var rows = [
+        { key: "healthy", count: s.healthy_accounts, hint: "当前可用，且最近有额度快照" },
+        { key: "recovering", count: s.recovering_accounts, hint: "被限流、周额度或 5h 用尽，但可计算恢复时间" },
+        { key: "quota_limited", count: s.quota_limited_accounts, hint: "受限但当前无法稳定归入恢复队列" },
+        { key: "failed", count: s.failed_accounts, hint: "状态停用、调度关闭或额度刷新失败" },
+        { key: "untracked", count: s.untracked_accounts, hint: "还没有额度快照，默认不计入周额度平均值分母" }
+      ];
+      elements.stateGrid.innerHTML = rows.map(function (row) {
+        return '' +
+          '<div class="state-row">' +
+            '<span class="' + statePillClass(row.key) + '">' + escapeHtml(stateLabel(row.key)) + '</span>' +
+            '<div><div class="name">' + escapeHtml(stateLabel(row.key)) + '</div><div class="hint">' + escapeHtml(row.hint) + '</div></div>' +
+            '<div class="count">' + escapeHtml(numberText(row.count)) + '</div>' +
+          '</div>';
+      }).join("");
+    }
+
+    function renderHistoryPreview() {
+      var meta = paginate(state.payload.history || [], "historyPreview", PAGE_DEFAULT_SIZE.historyPreview);
+      if (!meta.total) {
+        elements.historyPreview.innerHTML = '<div class="empty">暂无历史快照</div>';
+        elements.historyPreviewPager.innerHTML = "";
+        return;
+      }
+      elements.historyPreview.innerHTML = meta.items.map(function (row) {
+        return '' +
+          '<div class="history-row">' +
+            '<div class="mono">' + escapeHtml(dt(row.captured_at)) + '</div>' +
+            '<div><div class="name">健康 ' + escapeHtml(numberText(row.healthy_accounts)) + ' / 总计 ' + escapeHtml(numberText(row.total_accounts)) + '</div><div class="hint">恢复中 ' + escapeHtml(numberText(row.recovering_accounts)) + ' · 额度限制 ' + escapeHtml(numberText(row.quota_limited_accounts)) + ' · 失败 ' + escapeHtml(numberText(row.failed_accounts)) + '</div></div>' +
+            '<div class="count">' + escapeHtml(shortPct(row.avg_all_7d_remaining_pct)) + '</div>' +
+          '</div>';
+      }).join("");
+      elements.historyPreviewPager.innerHTML = pagerHtml("historyPreview", meta, "条快照");
+    }
+
+    function renderRecoveryPreview(rows) {
+      var meta = paginate(rows, "recoveryPreview", PAGE_DEFAULT_SIZE.recoveryPreview);
+      if (!meta.total) {
+        elements.recoveryPreview.innerHTML = '<div class="empty">当前没有恢复队列</div>';
+        elements.recoveryPreviewPager.innerHTML = "";
+        return;
+      }
+      elements.recoveryPreview.innerHTML = meta.items.map(accountCard).join("");
+      elements.recoveryPreviewPager.innerHTML = pagerHtml("recoveryPreview", meta, "个账号");
+    }
+
+    function renderMatrix(rows) {
+      elements.matrixCount.textContent = rows.length + " 个账号";
+      var meta = paginate(rows, "matrix", PAGE_DEFAULT_SIZE.matrix);
+      if (!meta.total) {
+        elements.matrixGrid.innerHTML = '<div class="empty">没有匹配的账号</div>';
+        elements.matrixPager.innerHTML = "";
+        return;
+      }
+      elements.matrixGrid.innerHTML = meta.items.map(accountCard).join("");
+      elements.matrixPager.innerHTML = pagerHtml("matrix", meta, "个账号");
+    }
+
+    function renderRecovery(rows) {
+      var lanes = {
+        immediate: [],
+        today: [],
+        soon: [],
+        later: [],
+        unknown: []
+      };
+      rows.forEach(function (row) {
+        var key = laneKeyFor(row);
+        lanes[key].push(row);
+      });
+      var order = ["immediate", "today", "soon", "later", "unknown"];
+      var html = [];
+      var total = 0;
+      order.forEach(function (key) {
+        if (!lanes[key].length) return;
+        total += lanes[key].length;
+        var pagerId = "lane:" + key;
+        var meta = paginate(lanes[key], pagerId, PAGE_DEFAULT_SIZE.recoveryLane);
+        html.push(
+          '<section class="lane">' +
+            '<div class="lane-head"><strong>' + escapeHtml(laneLabel(key)) + '</strong><span class="pill pill-neutral">' + escapeHtml(String(lanes[key].length)) + '</span></div>' +
+            '<div class="lane-grid">' + meta.items.map(accountCard).join("") + '</div>' +
+            '<div class="lane-pager">' + pagerHtml(pagerId, meta, "个账号") + '</div>' +
+          '</section>'
+        );
+      });
+      elements.recoveryCount.textContent = total + " 个账号";
+      elements.recoveryLanes.innerHTML = html.length ? html.join("") : '<div class="empty">当前没有匹配账号</div>';
+    }
+
+    function renderHistoryTable() {
+      var meta = paginate(state.payload.history || [], "history", PAGE_DEFAULT_SIZE.history);
+      elements.historyCount.textContent = meta.total + " 条";
+      if (!meta.total) {
+        elements.historyRows.innerHTML = '<tr><td colspan="12"><div class="empty">暂无历史快照</div></td></tr>';
+        elements.historyPager.innerHTML = "";
+        return;
+      }
+      elements.historyRows.innerHTML = meta.items.map(function (row) {
+        return '' +
+          '<tr>' +
+            '<td class="mono">' + escapeHtml(dt(row.captured_at)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.total_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.healthy_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.recovering_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.quota_limited_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.failed_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.tracked_7d_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.schedulable_tracked_7d_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(pct(row.avg_all_7d_remaining_pct)) + '</td>' +
+            '<td class="mono">' + escapeHtml(pct(row.avg_7d_remaining_pct)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.total_all_7d_equiv_accounts)) + '</td>' +
+            '<td class="mono">' + escapeHtml(numberText(row.total_7d_equiv_accounts)) + '</td>' +
+          '</tr>';
+      }).join("");
+      elements.historyPager.innerHTML = pagerHtml("history", meta, "条记录");
+    }
+
+    function renderDetail() {
+      if (!state.selectedAccount) {
+        elements.detailSide.classList.remove("open");
+        elements.sideBackdrop.classList.remove("open");
+        elements.detailSide.setAttribute("aria-hidden", "true");
+        return;
+      }
+      var row = state.selectedAccount;
+      elements.detailTitle.textContent = row.name || "账号详情";
+      elements.detailSubtitle.textContent = "#" + row.id + " · " + planLabel(row.plan_type) + " · " + stateLabel(row.state_key);
+      elements.detailBody.innerHTML = '' +
+        '<section class="detail-block">' +
+          '<h3>状态</h3>' +
+          '<div class="detail-grid">' +
+            detailItem("状态", '<span class="' + statePillClass(row.state_key) + '">' + escapeHtml(stateLabel(row.state_key)) + '</span>') +
+            detailItem("说明", escapeHtml(row.state_reason || "-")) +
+            detailItem("调度", escapeHtml(row.effective_schedulable ? "可调度" : "不可调度")) +
+            detailItem("刷新状态", escapeHtml(row.quota_refresh_status || "-")) +
+            detailItem("恢复来源", escapeHtml(recoverySourceLabel(row.recovery_source))) +
+            detailItem("最早恢复", escapeHtml(dt(row.earliest_recovery_at))) +
+          '</div>' +
+        '</section>' +
+        '<section class="detail-block">' +
+          '<h3>额度</h3>' +
+          '<div class="detail-grid">' +
+            detailItem("周额度剩余", escapeHtml(pct(row.weekly_remaining_percent))) +
+            detailItem("5h 剩余", escapeHtml(pct(row.five_hour_remaining_percent))) +
+            detailItem("周额度恢复", escapeHtml(dt(row.weekly_recovery_at || row.weekly_next_reset_at))) +
+            detailItem("5h 恢复", escapeHtml(dt(row.five_hour_recovery_at || row.five_hour_next_reset_at))) +
+            detailItem("周原始剩余", escapeHtml(pct(row.codex_7d_remaining_percent))) +
+            detailItem("主额度剩余", escapeHtml(pct(row.codex_primary_remaining_percent))) +
+            detailItem("5h 原始剩余", escapeHtml(pct(row.codex_5h_remaining_percent))) +
+            detailItem("次级额度剩余", escapeHtml(pct(row.codex_secondary_remaining_percent))) +
+          '</div>' +
+        '</section>' +
+        '<section class="detail-block">' +
+          '<h3>时间</h3>' +
+          '<div class="detail-grid">' +
+            detailItem("额度更新时间", escapeHtml(dt(row.usage_updated_at))) +
+            detailItem("刷新落库时间", escapeHtml(dt(row.quota_refreshed_at))) +
+            detailItem("最后使用", escapeHtml(dt(row.last_used_at))) +
+            detailItem("限流重置", escapeHtml(dt(row.rate_limit_reset_at))) +
+            detailItem("临时冻结到", escapeHtml(dt(row.temp_unschedulable_until))) +
+            detailItem("过载恢复到", escapeHtml(dt(row.overload_until))) +
+          '</div>' +
+        '</section>' +
+        '<section class="detail-block">' +
+          '<h3>错误与原因</h3>' +
+          '<div class="detail-grid">' +
+            detailItem("刷新错误", escapeHtml(row.quota_refresh_error || "-")) +
+            detailItem("临时冻结原因", escapeHtml(row.temp_unschedulable_reason || "-")) +
+          '</div>' +
+        '</section>';
+      elements.detailSide.classList.add("open");
+      elements.sideBackdrop.classList.add("open");
+      elements.detailSide.setAttribute("aria-hidden", "false");
+    }
+
+    function detailItem(key, value) {
+      return '' +
+        '<div class="detail-item">' +
+          '<div class="detail-key">' + key + '</div>' +
+          '<div class="detail-value">' + value + '</div>' +
+        '</div>';
+    }
+
+    function renderAll() {
+      if (!state.payload) return;
+      populatePlanFilter();
+      renderSummaryCards();
+      renderPlans();
+      renderStateGrid();
+      renderHistoryPreview();
+      renderHistoryTable();
+
+      var rows = filteredAccounts();
+      sortAccounts(rows);
+      var recoverableRows = recoveryCandidates(rows);
+      sortRecoveryRows(recoverableRows);
+      renderMatrix(rows);
+      renderRecoveryPreview(recoverableRows);
+      renderRecovery(rows);
+
+      if (state.selectedId != null) {
+        var found = null;
+        rows.some(function (row) {
+          if (row.id === state.selectedId) {
+            found = row;
+            return true;
+          }
+          return false;
+        });
+        state.selectedAccount = found || findAccountById(state.selectedId);
+      } else {
+        state.selectedAccount = null;
+      }
+      renderDetail();
+    }
+
+    function findAccountById(id) {
+      if (!state.payload || !state.payload.accounts) return null;
+      var i;
+      for (i = 0; i < state.payload.accounts.length; i += 1) {
+        if (state.payload.accounts[i].id === id) return state.payload.accounts[i];
+      }
+      return null;
+    }
+
+    function applyData(payload) {
+      state.pages = {};
+      state.payload = payload;
+      var summary = payload.summary || {};
+      setStatus(
+        "当前展示上次已保存结果 · 生成时间 " + dt(payload.generated_at) +
+        " · 存活 " + numberText(summary.alive_accounts) +
+        " / 总账号 " + numberText(summary.total_accounts) +
+        " · 周额度成功 " + numberText(summary.tracked_7d_accounts)
+      );
+      renderAll();
+    }
+
+    function load(path) {
+      clearError();
+      setLoading(true);
+      setStatus(path === "/api/quotas/refresh" ? "正在同步额度数据..." : "正在读取上次结果...");
+      var auth = authQuery();
+      if (!auth) {
+        setLoading(false);
+        showError("缺少授权参数，请从后台菜单进入，或使用带 secret 的直链访问。");
+        return;
+      }
+      request(path + "?" + auth, function (err, text) {
+        setLoading(false);
+        if (err) {
+          showError(err.message || String(err));
+          return;
+        }
+        try {
+          applyData(JSON.parse(text));
+        } catch (e) {
+          showError(e && e.message ? e.message : String(e));
+        }
+      });
+    }
+
+    function setView(view) {
+      state.activeView = view;
+      ["overview", "matrix", "recovery", "history"].forEach(function (key) {
+        var page = document.getElementById("page" + key.charAt(0).toUpperCase() + key.slice(1));
+        if (page) page.classList.toggle("active", key === view);
+      });
+      Array.prototype.slice.call(document.querySelectorAll(".view-tab")).forEach(function (button) {
+        button.classList.toggle("active", button.getAttribute("data-view") === view);
+      });
+    }
+
+    function bindAccountCards() {
+      document.body.addEventListener("click", function (event) {
+        var target = event.target;
+        while (target && target !== document.body) {
+          if (target.hasAttribute && target.hasAttribute("data-account-id")) {
+            var id = Number(target.getAttribute("data-account-id"));
+            state.selectedId = id;
+            state.selectedAccount = findAccountById(id);
+            renderDetail();
+            return;
+          }
+          target = target.parentNode;
+        }
+      });
+    }
+
+    function bindPagers() {
+      document.body.addEventListener("click", function (event) {
+        var target = event.target;
+        while (target && target !== document.body) {
+          if (target.hasAttribute && target.hasAttribute("data-pager-id")) {
+            var pagerId = target.getAttribute("data-pager-id");
+            var nextPage = Number(target.getAttribute("data-page-number"));
+            if (!pagerId || !isFinite(nextPage) || nextPage < 1) return;
+            state.pages[pagerId] = nextPage;
+            renderAll();
+            return;
+          }
+          target = target.parentNode;
+        }
+      });
+      document.body.addEventListener("change", function (event) {
+        var target = event.target;
+        if (!target || !target.hasAttribute || !target.hasAttribute("data-page-size-id")) return;
+        var pagerId = target.getAttribute("data-page-size-id");
+        var nextSize = Number(target.value);
+        if (!pagerId || PAGE_SIZE_OPTIONS.indexOf(nextSize) === -1) return;
+        state.pageSizes[pagerId] = nextSize;
+        state.pages[pagerId] = 1;
+        renderAll();
+      });
+    }
+
+    function bindCollapsibles() {
+      document.body.addEventListener("click", function (event) {
+        var target = event.target;
+        while (target && target !== document.body) {
+          if (target.hasAttribute && target.hasAttribute("data-collapse-id")) {
+            var id = target.getAttribute("data-collapse-id");
+            setPanelCollapsed(id, !state.collapsedPanels[id]);
+            return;
+          }
+          target = target.parentNode;
+        }
+      });
+    }
+
+    var state = {
+      token: getParam("token"),
+      secret: getParam("secret"),
+      theme: getParam("theme"),
+      embedded: getParam("ui_mode") === "embedded",
+      activeView: "overview",
+      loading: false,
+      collapsedPanels: readCollapseState(),
+      pages: {},
+      pageSizes: {},
+      payload: null,
+      selectedId: null,
+      selectedAccount: null
+    };
+
+    var elements = {
+      statusLine: document.getElementById("statusLine"),
+      errorBanner: document.getElementById("errorBanner"),
+      refresh: document.getElementById("refresh"),
+      scopeNote: document.getElementById("scopeNote"),
+      searchInput: document.getElementById("searchInput"),
+      stateFilter: document.getElementById("stateFilter"),
+      planFilter: document.getElementById("planFilter"),
+      accountMode: document.getElementById("accountMode"),
+      summaryCards: document.getElementById("summaryCards"),
+      planOverviewBadge: document.getElementById("planOverviewBadge"),
+      planGrid: document.getElementById("planGrid"),
+      stateGrid: document.getElementById("stateGrid"),
+      recoveryPreview: document.getElementById("recoveryPreview"),
+      recoveryPreviewPager: document.getElementById("recoveryPreviewPager"),
+      historyPreview: document.getElementById("historyPreview"),
+      historyPreviewPager: document.getElementById("historyPreviewPager"),
+      matrixCount: document.getElementById("matrixCount"),
+      matrixGrid: document.getElementById("matrixGrid"),
+      matrixPager: document.getElementById("matrixPager"),
+      recoveryCount: document.getElementById("recoveryCount"),
+      recoveryLanes: document.getElementById("recoveryLanes"),
+      historyCount: document.getElementById("historyCount"),
+      historyRows: document.getElementById("historyRows"),
+      historyPager: document.getElementById("historyPager"),
+      sideBackdrop: document.getElementById("sideBackdrop"),
+      detailSide: document.getElementById("detailSide"),
+      detailTitle: document.getElementById("detailTitle"),
+      detailSubtitle: document.getElementById("detailSubtitle"),
+      detailBody: document.getElementById("detailBody")
+    };
+
+    if (state.theme === "dark" || state.theme === "light") {
+      document.documentElement.setAttribute("data-theme", state.theme);
+    }
+    if (state.embedded) {
+      document.documentElement.setAttribute("data-embedded", "true");
+    }
+
+    elements.refresh.addEventListener("click", function () {
+      load("/api/quotas/refresh");
+    });
+    elements.sideBackdrop.addEventListener("click", function () {
+      state.selectedId = null;
+      state.selectedAccount = null;
+      renderDetail();
+    });
+    elements.searchInput.addEventListener("input", function () {
+      resetFilteredPages();
+      renderAll();
+    });
+    elements.stateFilter.addEventListener("change", function () {
+      resetFilteredPages();
+      renderAll();
+    });
+    elements.planFilter.addEventListener("change", function () {
+      resetFilteredPages();
+      renderAll();
+    });
+    elements.accountMode.addEventListener("change", function () {
+      resetFilteredPages();
+      renderAll();
+    });
+    Array.prototype.slice.call(document.querySelectorAll(".view-tab")).forEach(function (button) {
+      button.addEventListener("click", function () {
+        setView(button.getAttribute("data-view"));
+      });
+    });
+
+    bindAccountCards();
+    bindPagers();
+    bindCollapsibles();
+    syncCollapsedPanels();
+    setView("overview");
+    load("/api/quotas");
+  })();
+  </script>
+</body>
+</html>
