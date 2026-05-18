@@ -76,10 +76,13 @@ main() {
   require_var POSTGRES_PASSWORD
   require_var POSTGRES_DB
   require_var QUOTA_DASHBOARD_SUB2API_BASE_URL
-  require_var QUOTA_DASHBOARD_ADMIN_EMAIL
-  require_var QUOTA_DASHBOARD_ADMIN_PASSWORD
   require_var QUOTA_DASHBOARD_TOKEN
   require_var QUOTA_DASHBOARD_PORT
+
+  if [ -z "${QUOTA_DASHBOARD_ADMIN_API_KEY:-}" ]; then
+    require_var QUOTA_DASHBOARD_ADMIN_EMAIL
+    require_var QUOTA_DASHBOARD_ADMIN_PASSWORD
+  fi
 
   check_url "$QUOTA_DASHBOARD_SUB2API_BASE_URL" "QUOTA_DASHBOARD_SUB2API_BASE_URL"
   if [ -n "${QUOTA_DASHBOARD_PUBLIC_URL:-}" ]; then
@@ -102,6 +105,7 @@ main() {
   note "- the quota dashboard container must be able to reach POSTGRES_HOST"
   note "- the quota dashboard container must be able to reach QUOTA_DASHBOARD_SUB2API_BASE_URL"
   note "- if sub2api runs in another Docker network, join that network before deploy"
+  note "- scheduled refresh can use QUOTA_DASHBOARD_ADMIN_API_KEY or fallback admin credentials"
 }
 
 main "$@"

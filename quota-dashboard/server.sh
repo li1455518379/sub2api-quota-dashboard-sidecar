@@ -15,10 +15,11 @@ USAGE_REFRESH_BATCH_SIZE="${USAGE_REFRESH_BATCH_SIZE:-1000}"
 USAGE_REFRESH_TIMEOUT_SECONDS="${USAGE_REFRESH_TIMEOUT_SECONDS:-15}"
 USAGE_REFRESH_TOKEN_FILE="${USAGE_REFRESH_TOKEN_FILE:-/tmp/quota-dashboard-admin-token}"
 USAGE_REFRESH_LOCK_DIR="${USAGE_REFRESH_LOCK_DIR:-/tmp/quota-dashboard-usage-refresh.lock}"
+SUB2API_ADMIN_API_KEY="${SUB2API_ADMIN_API_KEY:-}"
 SUB2API_ADMIN_EMAIL="${SUB2API_ADMIN_EMAIL:-}"
 SUB2API_ADMIN_PASSWORD="${SUB2API_ADMIN_PASSWORD:-}"
 
-AUTHORIZED_ADMIN_TOKEN=""
+AUTHORIZED_ADMIN_CREDENTIAL=""
 
 export PGPASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
 
@@ -52,12 +53,95 @@ query_param() {
     printf '%s' "$query" | tr '&' '\n' | awk -F= -v key="$name" '$1 == key { print $2; exit }'
 }
 
+trim_spaces() {
+    printf '%s' "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+read_first_present_query_param() {
+    query="$1"
+    shift
+    for key in "$@"; do
+        value="$(query_param "$key" "$query")"
+        if [ -n "$value" ]; then
+            printf '%s' "$value"
+            return 0
+        fi
+    done
+    return 1
+}
+
+make_admin_api_key_credential() {
+    printf 'api_key:%s' "$1"
+}
+
+make_admin_token_credential() {
+    printf 'token:%s' "$1"
+}
+
+admin_credential_kind() {
+    credential="$1"
+    case "$credential" in
+        api_key:*)
+            printf 'api_key'
+            ;;
+        token:*)
+            printf 'token'
+            ;;
+        *)
+            printf 'token'
+            ;;
+    esac
+}
+
+admin_credential_value() {
+    credential="$1"
+    case "$credential" in
+        api_key:*|token:*)
+            printf '%s' "${credential#*:}"
+            ;;
+        *)
+            printf '%s' "$credential"
+            ;;
+    esac
+}
+
+admin_auth_header() {
+    credential="$1"
+    kind="$(admin_credential_kind "$credential")"
+    value="$(admin_credential_value "$credential")"
+    [ -n "$value" ] || return 1
+
+    case "$kind" in
+        api_key)
+            printf 'x-api-key: %s' "$value"
+            ;;
+        token)
+            printf 'Authorization: Bearer %s' "$value"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+is_admin_credential() {
+    credential="$1"
+    header="$(admin_auth_header "$credential")" || return 1
+    wget -q -T 5 --tries=1 -O /dev/null \
+        --header="$header" \
+        "${SUB2API_BASE_URL%/}/api/v1/admin/users?page_size=1"
+}
+
+is_admin_api_key() {
+    api_key="$1"
+    [ -n "$api_key" ] || return 1
+    is_admin_credential "$(make_admin_api_key_credential "$api_key")"
+}
+
 is_admin_token() {
     token="$1"
     [ -n "$token" ] || return 1
-    wget -q -T 5 --tries=1 -O /dev/null \
-        --header="Authorization: Bearer $token" \
-        "${SUB2API_BASE_URL%/}/api/v1/admin/users?page_size=1"
+    is_admin_credential "$(make_admin_token_credential "$token")"
 }
 
 login_admin_token() {
@@ -72,16 +156,49 @@ login_admin_token() {
 
     token="$(printf '%s' "$response" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
     [ -n "$token" ] || return 1
-    save_admin_token "$token"
+    credential="$(make_admin_token_credential "$token")"
+    save_admin_credential "$credential"
+    printf '%s' "$credential"
+}
+
+extract_bearer_token() {
+    authorization_header="$(trim_spaces "${1:-}")"
+    token="$(printf '%s' "$authorization_header" | sed -n 's/^[Bb][Ee][Aa][Rr][Ee][Rr][[:space:]]\{1,\}//p')"
+    [ -n "$token" ] || return 1
     printf '%s' "$token"
 }
 
 is_authorized() {
     query="$1"
-    AUTHORIZED_ADMIN_TOKEN=""
+    authorization_header="${2:-}"
+    x_api_key_header="${3:-}"
+    x_admin_api_header="${4:-}"
+    AUTHORIZED_ADMIN_CREDENTIAL=""
+
+    admin_api_key="$(trim_spaces "$x_api_key_header")"
+    if [ -z "$admin_api_key" ]; then
+        admin_api_key="$(trim_spaces "$x_admin_api_header")"
+    fi
+    if [ -n "$admin_api_key" ] && is_admin_api_key "$admin_api_key"; then
+        AUTHORIZED_ADMIN_CREDENTIAL="$(make_admin_api_key_credential "$admin_api_key")"
+        return 0
+    fi
+
+    token="$(extract_bearer_token "$authorization_header" 2>/dev/null || true)"
+    if [ -n "$token" ] && is_admin_token "$token"; then
+        AUTHORIZED_ADMIN_CREDENTIAL="$(make_admin_token_credential "$token")"
+        return 0
+    fi
+
+    admin_api_key="$(read_first_present_query_param "$query" admin_api_key x_admin_api x-admin-api admin_api x-api-key 2>/dev/null || true)"
+    if [ -n "$admin_api_key" ] && is_admin_api_key "$admin_api_key"; then
+        AUTHORIZED_ADMIN_CREDENTIAL="$(make_admin_api_key_credential "$admin_api_key")"
+        return 0
+    fi
+
     token="$(query_param token "$query")"
     if [ -n "$token" ] && is_admin_token "$token"; then
-        AUTHORIZED_ADMIN_TOKEN="$token"
+        AUTHORIZED_ADMIN_CREDENTIAL="$(make_admin_token_credential "$token")"
         return 0
     fi
 
@@ -105,17 +222,17 @@ sync_custom_menu() {
         -f /app/sync_menu.sql >/dev/null
 }
 
-save_admin_token() {
-    token="$1"
-    [ -n "$token" ] || return 0
+save_admin_credential() {
+    credential="$1"
+    [ -n "$credential" ] || return 0
 
     umask 077
     tmp_file="${USAGE_REFRESH_TOKEN_FILE}.tmp"
-    printf '%s' "$token" > "$tmp_file"
+    printf '%s' "$credential" > "$tmp_file"
     mv "$tmp_file" "$USAGE_REFRESH_TOKEN_FILE"
 }
 
-load_admin_token() {
+load_admin_credential() {
     [ -f "$USAGE_REFRESH_TOKEN_FILE" ] || return 1
     tr -d '\r\n' < "$USAGE_REFRESH_TOKEN_FILE"
 }
@@ -154,9 +271,10 @@ record_refresh_state() {
 
 refresh_account_usage() {
     account_id="$1"
-    token="$2"
+    credential="$2"
+    header="$(admin_auth_header "$credential")" || return 1
     if body="$(wget -q -T "$USAGE_REFRESH_TIMEOUT_SECONDS" --tries=1 -O - \
-        --header="Authorization: Bearer $token" \
+        --header="$header" \
         "${SUB2API_BASE_URL%/}/api/v1/admin/accounts/${account_id}/usage")"; then
         body_b64="$(printf '%s' "$body" | base64 | tr -d '\n')"
         if psql_base \
@@ -175,31 +293,47 @@ refresh_account_usage() {
     fi
 }
 
+resolve_admin_credential() {
+    preferred="${1:-}"
+
+    if [ -n "$preferred" ] && is_admin_credential "$preferred"; then
+        printf '%s' "$preferred"
+        return 0
+    fi
+
+    if [ -n "$SUB2API_ADMIN_API_KEY" ]; then
+        credential="$(make_admin_api_key_credential "$SUB2API_ADMIN_API_KEY")"
+        if is_admin_credential "$credential"; then
+            printf '%s' "$credential"
+            return 0
+        fi
+    fi
+
+    credential="$(load_admin_credential 2>/dev/null || true)"
+    if [ -n "$credential" ] && is_admin_credential "$credential"; then
+        printf '%s' "$credential"
+        return 0
+    fi
+    rm -f "$USAGE_REFRESH_TOKEN_FILE"
+
+    credential="$(login_admin_token 2>/dev/null || true)"
+    if [ -n "$credential" ] && is_admin_credential "$credential"; then
+        printf '%s' "$credential"
+        return 0
+    fi
+
+    return 1
+}
+
 run_usage_refresh() {
     source="${1:-scheduled}"
-    token="${2:-}"
-
-    if [ -z "$token" ]; then
-        token="$(load_admin_token 2>/dev/null || true)"
-    fi
-    if [ -z "$token" ]; then
-        token="$(login_admin_token 2>/dev/null || true)"
-    fi
-
-    if [ -z "$token" ]; then
+    credential="$(resolve_admin_credential "${2:-}" 2>/dev/null || true)"
+    if [ -z "$credential" ]; then
         printf '[quota-dashboard] usage refresh skip source=%s reason=no_admin_token\n' "$source" >&2
         return 0
     fi
 
-    if ! is_admin_token "$token"; then
-        rm -f "$USAGE_REFRESH_TOKEN_FILE"
-        token="$(login_admin_token 2>/dev/null || true)"
-        if [ -z "$token" ] || ! is_admin_token "$token"; then
-            printf '[quota-dashboard] usage refresh skip source=%s reason=admin_token_invalid\n' "$source" >&2
-            rm -f "$USAGE_REFRESH_TOKEN_FILE"
-            return 0
-        fi
-    fi
+    save_admin_credential "$credential"
 
     ids="$(fetch_usage_account_ids)"
     total="$(printf '%s\n' "$ids" | sed '/^$/d' | wc -l | tr -d ' ')"
@@ -213,7 +347,7 @@ run_usage_refresh() {
     printf '[quota-dashboard] usage refresh start source=%s total=%s\n' "$source" "$total" >&2
 
     for account_id in $ids; do
-        if refresh_account_usage "$account_id" "$token"; then
+        if refresh_account_usage "$account_id" "$credential"; then
             ok=$((ok + 1))
         else
             fail=$((fail + 1))
@@ -226,12 +360,12 @@ run_usage_refresh() {
 
 start_usage_refresh_async() {
     source="${1:-scheduled}"
-    token="${2:-}"
+    credential="${2:-}"
 
     if mkdir "$USAGE_REFRESH_LOCK_DIR" 2>/dev/null; then
         (
             trap 'rmdir "$USAGE_REFRESH_LOCK_DIR"' EXIT HUP INT TERM
-            run_usage_refresh "$source" "$token"
+            run_usage_refresh "$source" "$credential"
         ) &
     else
         printf '[quota-dashboard] usage refresh skip source=%s reason=busy\n' "$source" >&2
@@ -251,10 +385,28 @@ serve_quota_payload() {
 
 handle_request() {
     IFS= read -r request_line || exit 0
+    cr="$(printf '\r')"
+    authorization_header=""
+    x_api_key_header=""
+    x_admin_api_header=""
 
     while IFS= read -r header_line; do
-        [ "$header_line" = "$(printf '\r')" ] && break
+        [ "$header_line" = "$cr" ] && break
         [ -z "$header_line" ] && break
+        clean_header="${header_line%$cr}"
+        header_name="$(printf '%s' "$clean_header" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')"
+        header_value="$(trim_spaces "${clean_header#*:}")"
+        case "$header_name" in
+            authorization)
+                authorization_header="$header_value"
+                ;;
+            x-api-key)
+                x_api_key_header="$header_value"
+                ;;
+            x-admin-api)
+                x_admin_api_header="$header_value"
+                ;;
+        esac
     done
 
     method="$(printf '%s' "$request_line" | awk '{print $1}')"
@@ -285,24 +437,24 @@ handle_request() {
             ;;
         "/api/quotas")
             printf '[quota-dashboard] quotas start\n' >&2
-            if ! is_authorized "$query"; then
+            if ! is_authorized "$query" "$authorization_header" "$x_api_key_header" "$x_admin_api_header"; then
                 send_response "403 Forbidden" "application/json; charset=utf-8" '{"error":"forbidden"}'
                 exit 0
             fi
-            if [ -n "$AUTHORIZED_ADMIN_TOKEN" ]; then
-                save_admin_token "$AUTHORIZED_ADMIN_TOKEN"
+            if [ -n "$AUTHORIZED_ADMIN_CREDENTIAL" ]; then
+                save_admin_credential "$AUTHORIZED_ADMIN_CREDENTIAL"
             fi
             serve_quota_payload
             ;;
         "/api/quotas/refresh")
             printf '[quota-dashboard] quotas refresh start\n' >&2
-            if ! is_authorized "$query"; then
+            if ! is_authorized "$query" "$authorization_header" "$x_api_key_header" "$x_admin_api_header"; then
                 send_response "403 Forbidden" "application/json; charset=utf-8" '{"error":"forbidden"}'
                 exit 0
             fi
-            if [ -n "$AUTHORIZED_ADMIN_TOKEN" ]; then
-                save_admin_token "$AUTHORIZED_ADMIN_TOKEN"
-                run_usage_refresh "manual" "$AUTHORIZED_ADMIN_TOKEN"
+            if [ -n "$AUTHORIZED_ADMIN_CREDENTIAL" ]; then
+                save_admin_credential "$AUTHORIZED_ADMIN_CREDENTIAL"
+                run_usage_refresh "manual" "$AUTHORIZED_ADMIN_CREDENTIAL"
             else
                 run_usage_refresh "manual"
             fi

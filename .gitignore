@@ -1,3 +1,27 @@
 .env
 .env.local
+.env.*.local
+
+# Runtime data and local state
+data/
+postgres_data/
+redis_data/
+
+# Logs, dumps, backups
+*.log
+*.sql.gz
+*.dump
+*.bak
+*.bak-*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Local editor and tool state
 .DS_Store
+.vscode/
+.idea/
+.codex/
+.agents/

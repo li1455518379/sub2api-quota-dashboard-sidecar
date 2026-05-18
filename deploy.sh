@@ -76,7 +76,9 @@ main() {
   note ""
   note "Done."
   note "Open:"
-  note "http://your-host:${QUOTA_DASHBOARD_PORT:-18081}/?secret=${QUOTA_DASHBOARD_TOKEN:-}"
+  note "Direct access: http://your-host:${QUOTA_DASHBOARD_PORT:-18081}/?secret=${QUOTA_DASHBOARD_TOKEN:-}"
+  note "Same-origin embed: set QUOTA_DASHBOARD_PUBLIC_URL to your reverse proxy path, for example"
+  note "http://your-host:${REVERSE_PROXY_PORT:-18080}/quota-dashboard/?ui_mode=embedded"
 }
 
 main "$@"

@@ -57,12 +57,12 @@
       scroll-behavior: smooth;
       overflow-y: scroll;
       scrollbar-gutter: stable both-edges;
-      background: #ffffff;
+      background: var(--bg);
     }
     body {
       margin: 0;
       min-height: 100vh;
-      background: #ffffff;
+      background: var(--bg);
       color: var(--text);
       font: 14px/1.5 "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       -webkit-font-smoothing: antialiased;
@@ -1304,13 +1304,150 @@
 
     function authQuery() {
       if (state.secret) return "secret=" + encodeURIComponent(state.secret);
+      if (state.adminApiKey) return "admin_api_key=" + encodeURIComponent(state.adminApiKey);
+      if (state.xAdminApi) return "x_admin_api=" + encodeURIComponent(state.xAdminApi);
       if (state.token) return "token=" + encodeURIComponent(state.token);
       return "";
+    }
+
+    function looksLikeJwt(value) {
+      return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(String(value || "").trim());
+    }
+
+    function tokenFromUnknown(value, depth) {
+      var text;
+      var preferredKeys;
+      var i;
+      var key;
+      var nested;
+      if (depth > 2 || value == null) return "";
+      if (typeof value === "string") {
+        text = value.trim();
+        if (!text) return "";
+        if (looksLikeJwt(text)) return text;
+        if ((text.charAt(0) === "{" && text.charAt(text.length - 1) === "}") ||
+            (text.charAt(0) === "[" && text.charAt(text.length - 1) === "]")) {
+          try {
+            return tokenFromUnknown(JSON.parse(text), depth + 1);
+          } catch (err) {
+            return "";
+          }
+        }
+        return "";
+      }
+      if (typeof value !== "object") return "";
+
+      preferredKeys = ["auth_token", "access_token", "token", "accessToken", "authToken"];
+      for (i = 0; i < preferredKeys.length; i += 1) {
+        key = preferredKeys[i];
+        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+        nested = tokenFromUnknown(value[key], depth + 1);
+        if (nested) return nested;
+      }
+
+      for (key in value) {
+        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+        nested = tokenFromUnknown(value[key], depth + 1);
+        if (nested) return nested;
+      }
+      return "";
+    }
+
+    function authToken() {
+      var localStorageRef;
+      var keys;
+      var i;
+      var key;
+      var token;
+      try {
+        localStorageRef = window.localStorage;
+        if (!localStorageRef) return "";
+
+        keys = ["auth_token", "access_token", "token", "accessToken", "authToken"];
+        for (i = 0; i < keys.length; i += 1) {
+          token = tokenFromUnknown(localStorageRef.getItem(keys[i]), 0);
+          if (token) return token;
+        }
+
+        for (i = 0; i < localStorageRef.length; i += 1) {
+          key = localStorageRef.key(i);
+          if (!key) continue;
+          token = tokenFromUnknown(localStorageRef.getItem(key), 0);
+          if (token) return token;
+        }
+        return "";
+      } catch (err) {
+        return "";
+      }
+    }
+
+    function themeFromDocument(doc) {
+      if (!doc) return "";
+      var bodyTheme = String(doc.body && doc.body.getAttribute("data-theme") || "").toLowerCase();
+      if (bodyTheme === "dark" || bodyTheme === "light") return bodyTheme;
+      var rootTheme = String(doc.documentElement && doc.documentElement.getAttribute("data-theme") || "").toLowerCase();
+      if (rootTheme === "dark" || rootTheme === "light") return rootTheme;
+      var bodyClass = doc.body && doc.body.classList;
+      if (bodyClass && bodyClass.contains("dark")) return "dark";
+      if (bodyClass && bodyClass.contains("light")) return "light";
+      var rootClass = doc.documentElement && doc.documentElement.classList;
+      if (rootClass && rootClass.contains("dark")) return "dark";
+      if (rootClass && rootClass.contains("light")) return "light";
+      return "";
+    }
+
+    function parentDocument() {
+      try {
+        if (!window.parent || window.parent === window) return null;
+        return window.parent.document || null;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function detectTheme() {
+      var explicit = String(state.theme || "").toLowerCase();
+      if (explicit === "dark" || explicit === "light") return explicit;
+      var parentTheme = themeFromDocument(parentDocument());
+      if (parentTheme) return parentTheme;
+      var currentTheme = themeFromDocument(document);
+      if (currentTheme) return currentTheme;
+      if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
+      return "light";
+    }
+
+    function applyTheme(theme) {
+      if (theme !== "dark" && theme !== "light") return;
+      document.documentElement.setAttribute("data-theme", theme);
+    }
+
+    function syncTheme() {
+      applyTheme(detectTheme());
+    }
+
+    function watchParentTheme() {
+      var parentDoc = parentDocument();
+      if (!parentDoc || !window.MutationObserver) return;
+      var observer = new MutationObserver(syncTheme);
+      if (parentDoc.documentElement) {
+        observer.observe(parentDoc.documentElement, {
+          attributes: true,
+          attributeFilter: ["class", "data-theme"]
+        });
+      }
+      if (parentDoc.body) {
+        observer.observe(parentDoc.body, {
+          attributes: true,
+          attributeFilter: ["class", "data-theme"]
+        });
+      }
     }
 
     function request(url, done) {
       var xhr = new XMLHttpRequest();
       xhr.open("GET", url, true);
+      var token = authToken();
+      if (token) xhr.setRequestHeader("Authorization", "Bearer " + token);
       xhr.onreadystatechange = function () {
         if (xhr.readyState !== 4) return;
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -1982,14 +2119,17 @@
     function load(path) {
       clearError();
       setLoading(true);
-      setStatus(path === "/api/quotas/refresh" ? "正在同步额度数据..." : "正在读取上次结果...");
+      setStatus(path.indexOf("/refresh") !== -1 ? "正在同步额度数据..." : "正在读取上次结果...");
       var auth = authQuery();
-      if (!auth) {
+      var token = authToken();
+      if (!auth && !token) {
         setLoading(false);
-        showError("缺少授权参数，请从后台菜单进入，或使用带 secret 的直链访问。");
+        showError("缺少授权参数或后台登录态，请从后台菜单进入，或使用带 secret / admin_api_key / x_admin_api 的直链访问。");
         return;
       }
-      request(path + "?" + auth, function (err, text) {
+      var url = path;
+      if (auth) url += "?" + auth;
+      request(url, function (err, text) {
         setLoading(false);
         if (err) {
           showError(err.message || String(err));
@@ -2074,6 +2214,8 @@
     var state = {
       token: getParam("token"),
       secret: getParam("secret"),
+      adminApiKey: getParam("admin_api_key") || getParam("x-api-key"),
+      xAdminApi: getParam("x_admin_api") || getParam("x-admin-api") || getParam("admin_api"),
       theme: getParam("theme"),
       embedded: getParam("ui_mode") === "embedded",
       activeView: "overview",
@@ -2118,15 +2260,14 @@
       detailBody: document.getElementById("detailBody")
     };
 
-    if (state.theme === "dark" || state.theme === "light") {
-      document.documentElement.setAttribute("data-theme", state.theme);
-    }
+    syncTheme();
+    watchParentTheme();
     if (state.embedded) {
       document.documentElement.setAttribute("data-embedded", "true");
     }
 
     elements.refresh.addEventListener("click", function () {
-      load("/api/quotas/refresh");
+      load("api/quotas/refresh");
     });
     elements.sideBackdrop.addEventListener("click", function () {
       state.selectedId = null;
@@ -2160,9 +2301,9 @@
     bindCollapsibles();
     syncCollapsedPanels();
     setView("overview");
-    load("/api/quotas");
+    load("api/quotas");
     setInterval(function () {
-      load("/api/quotas");
+      load("api/quotas");
     }, 3600000);
   })();
   </script>
